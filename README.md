@@ -1,6 +1,8 @@
 # CMU 10-414/714: Deep Learning Systems
 ---
 
+My Solution of dlsys  
+
 [link](https://dlsyscourse.org/)
 
 | Homework | Colab Link | GitHub Repo |  
