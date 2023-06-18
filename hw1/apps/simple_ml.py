@@ -30,7 +30,23 @@ def parse_mnist(image_filesname, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    f_img = gzip.open(image_filesname, "rb")
+    _, n, _, _ = struct.unpack(">IIII", f_img.read(16))
+    f_label = gzip.open(label_filename, "rb")
+    f_label.read(8)
+
+    images, labels = [], []
+    for i in range(n):
+        # labels.append(int(struct.unpack(">I", f_label.read(1))))
+        labels.append(int(ord(f_label.read(1))))
+        image = []
+        for j in range(28 * 28):
+            image.append(float(ord(f_img.read(1))) / 255.)
+            # image.append(float(struct.unpack(">I", f_img.read(1))) / 255.)
+        images.append(image)
+    f_img.close()
+    f_label.close()
+    return np.array(images, dtype=np.float32), np.array(labels, dtype=np.uint8)
     ### END YOUR SOLUTION
 
 
@@ -51,7 +67,9 @@ def softmax_loss(Z, y_one_hot):
         Average softmax loss over the sample. (ndl.Tensor[np.float32])
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    z_y = ndl.ops.summation(Z * y_one_hot)
+    z_e = ndl.ops.summation(ndl.ops.log(ndl.ops.summation(ndl.ops.exp(Z), axes=(1, ))))
+    return (z_e - z_y) / y_one_hot.shape[0]
     ### END YOUR SOLUTION
 
 
@@ -80,7 +98,48 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
     """
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    for i in range(X.shape[0] // batch + 1):
+        start, end = i * batch, min((i+1)*batch, X.shape[0])
+        m = end - start
+        if m == 0:
+            break
+        Xb, yb = ndl.ops.Tensor(X[start: end]), y[start: end]
+        
+
+        Z = ndl.ops.matmul(ndl.ops.relu(ndl.ops.matmul(Xb, W1)), W2)
+        
+        y_one_hot = np.zeros(Z.shape)
+        y_one_hot[np.arange(Z.shape[0]), yb] = 1
+        y_one_hot = ndl.ops.Tensor(y_one_hot)
+
+        loss = softmax_loss(Z, y_one_hot)
+        loss.backward()
+
+        W1.data -= lr * ndl.Tensor(W1.grad.numpy().astype(np.float32))
+        W2.data -= lr * ndl.Tensor(W2.grad.numpy().astype(np.float32))
+        # W1 -= lr * W1.grad
+        # W2 -= lr * W2.grad
+    return W1, W2
+    # for i in range(X.shape[0] // batch + 1):
+    #     start, end = i * batch, min((i+1)*batch, X.shape[0])
+    #     m = end - start
+    #     if m == 0:
+    #         break
+    #     Xb, yb = X[start:end], y[start:end]
+    #     Xb = ndl.Tensor(Xb, requires_grad=False)
+    #     Z1 = Xb @ W1
+    #     A1 = ndl.ops.relu(Z1)
+    #     Z2 = A1 @ W2
+    #     y_one_hot = np.zeros(Z2.shape, dtype=np.float32)
+    #     y_one_hot[np.arange(Z2.shape[0]), yb] = 1
+    #     y_one_hot = ndl.Tensor(y_one_hot, requires_grad=False)
+    #     loss = softmax_loss(Z2, y_one_hot)     
+    #     loss.backward()
+    #     # FIXME: dtype error
+    #     print(W1.grad)
+    #     W1 -= lr * W1.grad 
+    #     W2 -= lr * W2.grad
+    # return W1, W2
     ### END YOUR SOLUTION
 
 
