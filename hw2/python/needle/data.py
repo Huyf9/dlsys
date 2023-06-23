@@ -1,3 +1,5 @@
+import gzip
+import struct
 import numpy as np
 from .autograd import Tensor
 
@@ -24,7 +26,9 @@ class RandomFlipHorizontal(Transform):
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if flip_img:
+            return np.flip(img, axis=1)
+        return img
         ### END YOUR SOLUTION
 
 
@@ -42,7 +46,17 @@ class RandomCrop(Transform):
         """
         shift_x, shift_y = np.random.randint(low=-self.padding, high=self.padding+1, size=2)
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        crop_img = np.zeros_like(img)
+        H, W = img.shape[0], img.shape[1]
+        if abs(shift_x) > H or abs(shift_y) > W:
+            return crop_img
+        img_start_x, img_end_x = max(shift_x, 0), min(H, shift_x + H)
+        img_start_y, img_end_y = max(shift_y, 0), min(W, shift_y + W)
+        start_x, end_x = max(0, -shift_x), min(H, H - shift_x)
+        start_y, end_y = max(0, -shift_y), min(W, W - shift_y)
+
+        crop_img[start_x: end_x, start_y: end_y, :] = img[img_start_x: img_end_x, img_start_y: img_end_y, :]
+        return crop_img
         ### END YOUR SOLUTION
 
 
@@ -98,16 +112,26 @@ class DataLoader:
         if not self.shuffle:
             self.ordering = np.array_split(np.arange(len(dataset)), 
                                            range(batch_size, len(dataset), batch_size))
+        else:
+            indices = np.arange(len(dataset))
+            np.random.shuffle(indices)
+            self.ordering = np.array_split(indices, 
+                                           range(batch_size, len(dataset), batch_size))
 
     def __iter__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.start = 0
         ### END YOUR SOLUTION
         return self
 
     def __next__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if self.start == len(self.ordering):
+            raise StopIteration
+    
+        samples = [Tensor(x) for x in self.dataset[self.ordering[self.start]]]
+        self.start += 1
+        return tuple(samples)
         ### END YOUR SOLUTION
 
 
@@ -119,17 +143,21 @@ class MNISTDataset(Dataset):
         transforms: Optional[List] = None,
     ):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        super().__init__(transforms)
+        self.images, self.labels = parse_mnist(image_filename, 
+                                               label_filename)
         ### END YOUR SOLUTION
 
     def __getitem__(self, index) -> object:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        image, label = self.images[index], self.labels[index]
+        image = self.apply_transforms(image.reshape((28, 28, -1))).reshape(-1, )
+        return image, label
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.labels)
         ### END YOUR SOLUTION
 
 class NDArrayDataset(Dataset):
@@ -141,3 +169,46 @@ class NDArrayDataset(Dataset):
 
     def __getitem__(self, i) -> object:
         return tuple([a[i] for a in self.arrays])
+
+
+def parse_mnist(image_filesname, label_filename):
+    """ Read an images and labels file in MNIST format.  See this page:
+    http://yann.lecun.com/exdb/mnist/ for a description of the file format.
+
+    Args:
+        image_filename (str): name of gzipped images file in MNIST format
+        label_filename (str): name of gzipped labels file in MNIST format
+
+    Returns:
+        Tuple (X,y):
+            X (numpy.ndarray[np.float32]): 2D numpy array containing the loaded
+                data.  The dimensionality of the data should be
+                (num_examples x input_dim) where 'input_dim' is the full
+                dimension of the data, e.g., since MNIST images are 28x28, it
+                will be 784.  Values should be of type np.float32, and the data
+                should be normalized to have a minimum value of 0.0 and a
+                maximum value of 1.0.
+
+            y (numpy.ndarray[dypte=np.int8]): 1D numpy array containing the
+                labels of the examples.  Values should be of type np.int8 and
+                for MNIST will contain the values 0-9.
+    """
+    ### BEGIN YOUR SOLUTION
+    f_img = gzip.open(image_filesname, "rb")
+    _, n, _, _ = struct.unpack(">IIII", f_img.read(16))
+    f_label = gzip.open(label_filename, "rb")
+    f_label.read(8)
+
+    images, labels = [], []
+    for i in range(n):
+        # labels.append(int(struct.unpack(">I", f_label.read(1))))
+        labels.append(int(ord(f_label.read(1))))
+        image = []
+        for j in range(28 * 28):
+            image.append(float(ord(f_img.read(1))) / 255.)
+            # image.append(float(struct.unpack(">I", f_img.read(1))) / 255.)
+        images.append(image)
+    f_img.close()
+    f_label.close()
+    return np.array(images, dtype=np.float32), np.array(labels, dtype=np.uint8)
+    ### END YOUR SOLUTION
